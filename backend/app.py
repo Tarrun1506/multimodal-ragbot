@@ -177,20 +177,23 @@ class RAGPipeline:
         formatted = re.sub(r'^\*\s+([^\n]+)', r'- \1', formatted, flags=re.MULTILINE)
         formatted = re.sub(r'^-\s+([^\n]+)', r'- \1', formatted, flags=re.MULTILINE)
         
-        # Handle inline bullet lists - comprehensive approach
+        # Handle inline bullet lists - only if there are multiple bullets
         lines = formatted.split('\n')
         new_lines = []
         
         for line in lines:
-            if '•' in line:
-                # Simple and reliable approach: split by bullet symbol
-                # Use regex to split on bullet points with optional surrounding whitespace
+            if '•' in line and line.count('•') > 1:
+                # Only process lines with multiple bullets (inline lists)
                 parts = re.split(r'\s*•\s*', line)
                 # Process each part
                 for part in parts:
                     clean_part = part.strip()
                     if clean_part:  # Skip empty parts
                         new_lines.append(f'- {clean_part}')
+            elif '•' in line:
+                # Single bullet - just convert to markdown
+                clean_line = line.replace('•', '-').strip()
+                new_lines.append(clean_line)
             else:
                 new_lines.append(line)
         
@@ -198,7 +201,8 @@ class RAGPipeline:
         
         # Clean up formatting issues
         formatted = re.sub(r'^\s*-\s*$', '', formatted, flags=re.MULTILINE)  # Remove empty bullets
-        formatted = re.sub(r'\n\s*\n', '\n', formatted)  # Remove extra empty lines
+        # Don't remove all double newlines - preserve paragraph breaks for regular text
+        formatted = re.sub(r'\n\s*\n\s*\n+', '\n\n', formatted)  # Only remove triple+ newlines
         
         # Keep long bullet points intact - don't break them
         # The user wants complete information, not truncated descriptions
@@ -232,10 +236,11 @@ class RAGPipeline:
         # Final cleanup for bullet formatting
         # Remove any remaining bullet symbols that weren't converted
         formatted = re.sub(r'•', '', formatted)
-        # Clean up multiple consecutive newlines
-        formatted = re.sub(r'\n{3,}', '\n\n', formatted)
-        # Remove empty lines between bullets
-        formatted = re.sub(r'\n\s*\n(-\s)', r'\n\1', formatted)
+        # Clean up multiple consecutive newlines but preserve paragraph structure
+        formatted = re.sub(r'\n{4,}', '\n\n', formatted)
+        # Only remove empty lines between bullets if they are actually bullet lists
+        if '- ' in formatted and formatted.count('- ') > 2:
+            formatted = re.sub(r'\n\s*\n(-\s)', r'\n\1', formatted)
         # Ensure proper spacing before bullet lists (but not between bullets)
         formatted = re.sub(r'([^\n-])\n(-\s)', r'\1\n\n\2', formatted)
         
@@ -285,18 +290,16 @@ Question: {query}
 
 Instructions:
 1. Answer ONLY what is specifically asked - be direct and concise
-2. If the question asks for a specific fact (like "who is the publisher"), provide just that fact
+2. If the question asks for a specific fact, provide that fact clearly
 3. Don't include additional information unless directly relevant to the question
 4. Use **bold text** for the key answer
-5. If you need to provide a list, format it as follows (each item MUST be on a separate line):
+5. For simple answers, use plain text. For lists with multiple items, use bullet points:
    - Item 1
    - Item 2
    - Item 3
-   
-   NEVER write: • Item1 • Item2 • Item3
-   ALWAYS write each item on its own line with proper spacing
 6. For mathematical formulas, use proper notation
 7. If the context doesn't contain the specific information asked, say so clearly
+8. Keep your response natural and readable
 
 Provide a focused, direct answer:"""
 
