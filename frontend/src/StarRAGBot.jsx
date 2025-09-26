@@ -3,6 +3,7 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import InputArea from './components/InputArea';
+
 const StarRAGBot = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -18,6 +19,23 @@ const StarRAGBot = () => {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  // App container styles - ChatGPT-like dark theme
+  const appStyles = {
+    display: 'flex',
+    height: '100vh',
+    backgroundColor: '#343541',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    color: '#ffffff'
+  };
+
+  // Main content area styles
+  const mainContentStyles = {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
+    backgroundColor: '#343541'
+  };
 
   // Fetch uploaded documents
   const fetchDocuments = async () => {
@@ -162,7 +180,7 @@ const StarRAGBot = () => {
   }, [messages]);
 
   return (
-    <div className="flex h-screen bg-white">
+    <div style={appStyles}>
       <Sidebar
         conversations={conversations}
         selectedConversationId={selectedConversationId}
@@ -172,7 +190,7 @@ const StarRAGBot = () => {
         sidebarOpen={sidebarOpen}
       />
 
-      <div className="flex-1 flex flex-col">
+      <div style={mainContentStyles}>
         <Header 
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           selectedModel={selectedModel}
@@ -189,6 +207,9 @@ const StarRAGBot = () => {
           setInputMessage={setInputMessage}
           handleSendMessage={handleSendMessage}
           isLoading={isLoading}
+          onUploadFile={handleFileUpload}
+          documents={documents}
+          onDeleteDocument={deleteDocument}
         />
       </div>
     </div>

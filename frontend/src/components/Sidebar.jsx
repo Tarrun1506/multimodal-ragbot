@@ -9,47 +9,165 @@ const Sidebar = ({
   onSelectConversation,
   sidebarOpen
 }) => {
+  // ChatGPT-like dark theme styles
+  const sidebarStyles = {
+    width: sidebarOpen ? '260px' : '0',
+    backgroundColor: '#202123',
+    borderRight: '1px solid #4a4a4a',
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    transition: 'width 0.3s ease-in-out',
+    overflow: 'hidden',
+    flexShrink: 0,
+  };
+
+  const newChatButtonStyles = {
+    width: 'calc(100% - 32px)',
+    margin: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: '12px',
+    backgroundColor: 'transparent',
+    color: '#ffffff',
+    border: '1px solid #565869',
+    padding: '12px 16px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 400,
+    transition: 'background-color 0.2s, border-color 0.2s',
+  };
+
+  const newChatButtonHoverStyles = {
+    backgroundColor: '#343541',
+    borderColor: '#8e8ea0',
+  };
+
+  const contentAreaStyles = {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '0 8px 16px 8px',
+  };
+
+  const historyTitleStyles = {
+    padding: '8px 12px 4px 12px',
+    fontSize: '12px',
+    fontWeight: 500,
+    color: '#8e8ea0',
+    textTransform: 'uppercase',
+    letterSpacing: '0.05em',
+    marginBottom: '4px',
+  };
+
+  const loadingContainerStyles = {
+    display: 'flex',
+    justifyContent: 'center',
+    padding: '16px 0',
+  };
+
+  const emptyStateStyles = {
+    textAlign: 'center',
+    padding: '16px 0',
+    color: '#8e8ea0',
+    fontSize: '14px',
+    fontStyle: 'italic',
+  };
+
+  const conversationListStyles = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+  };
+
+  const conversationButtonStyles = {
+    width: '100%',
+    textAlign: 'left',
+    padding: '10px 12px',
+    borderRadius: '4px',
+    border: 'none',
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    fontSize: '14px',
+    color: '#ececf1',
+    fontWeight: 400,
+  };
+
+  const conversationButtonSelectedStyles = {
+    backgroundColor: '#343541',
+    color: '#ffffff',
+  };
+
+  const conversationButtonHoverStyles = {
+    backgroundColor: '#2a2b32',
+  };
+
   return (
-    <div className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-gray-50 border-r border-gray-200 flex flex-col h-full transition-all duration-300 overflow-hidden`}>
-      <div className="p-4">
+    <div style={sidebarStyles}>
+      <div style={{padding: '16px'}}>
         <button
           onClick={onNewChat}
-          className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg transition-colors"
+          style={newChatButtonStyles}
+          onMouseEnter={(e) => Object.assign(e.target.style, newChatButtonHoverStyles)}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = 'transparent';
+            e.target.style.borderColor = '#565869';
+          }}
         >
-          <Plus className="w-4 h-4" />
+          <Plus size={16} />
           <span>New chat</span>
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-4">
-        <h3 className="px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+      <div style={contentAreaStyles}>
+        <h3 style={historyTitleStyles}>
+          <History size={12} style={{display: 'inline', marginRight: '8px'}} />
           History
         </h3>
         
         {isLoadingConversations ? (
-          <div className="flex justify-center py-4">
-            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+          <div style={loadingContainerStyles}>
+            <Loader2 size={16} className="animate-spin" color="#8e8ea0" />
           </div>
         ) : conversations.length === 0 ? (
-          <div className="text-center py-4 text-gray-400 text-sm">
+          <div style={emptyStateStyles}>
             No conversations yet
           </div>
         ) : (
-          <div className="space-y-1">
+          <div style={conversationListStyles}>
             {conversations.map(conv => (
               <button
                 key={conv.conversation_id}
                 onClick={() => onSelectConversation(conv.conversation_id)}
-                className={`w-full text-left p-2 rounded-md transition-colors ${
-                  selectedConversationId === conv.conversation_id
-                    ? 'bg-gray-200 text-gray-900'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
+                style={{
+                  ...conversationButtonStyles,
+                  ...(selectedConversationId === conv.conversation_id ? conversationButtonSelectedStyles : {})
+                }}
+                onMouseEnter={(e) => {
+                  if (selectedConversationId !== conv.conversation_id) {
+                    Object.assign(e.target.style, conversationButtonHoverStyles);
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedConversationId !== conv.conversation_id) {
+                    e.target.style.backgroundColor = 'transparent';
+                  }
+                }}
               >
-                <div className="flex items-center gap-2 truncate">
-                  <MessageSquare className="w-4 h-4 flex-shrink-0 text-gray-500" />
-                  <span className="truncate">{conv.first_query || 'New conversation'}</span>
-                </div>
+                <MessageSquare size={16} color="#8e8ea0" />
+                <span style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  flex: 1,
+                }}>
+                  {conv.first_query || 'New conversation'}
+                </span>
               </button>
             ))}
           </div>

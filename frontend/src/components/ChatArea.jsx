@@ -14,10 +14,9 @@ const ChatArea = ({ messages, isLoading, messagesEndRef }) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedIndex(index);
-      setTimeout(() => setCopiedIndex(null), 2000); // Reset after 2 seconds
+      setTimeout(() => setCopiedIndex(null), 2000);
     } catch (err) {
       console.error('Failed to copy text: ', err);
-      // Fallback for older browsers
       const textArea = document.createElement('textarea');
       textArea.value = text;
       document.body.appendChild(textArea);
@@ -31,19 +30,220 @@ const ChatArea = ({ messages, isLoading, messagesEndRef }) => {
   
   const markAsHelpful = (index) => {
     setHelpfulIndex(index);
-    // You could send this feedback to the backend here
     console.log('Message marked as helpful:', index);
   };
 
+  // ChatGPT-like dark theme styles
+  const chatAreaStyles = {
+    flex: 1,
+    overflowY: 'auto',
+    backgroundColor: '#343541',
+  };
+
+  const emptyStateStyles = {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    color: '#d1d5db',
+  };
+
+  const emptyStateIconStyles = {
+    width: '64px',
+    height: '64px',
+    background: 'linear-gradient(135deg, #40414f 0%, #565869 100%)',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: '24px',
+  };
+
+  const emptyStateTitleStyles = {
+    fontSize: '24px',
+    fontWeight: 600,
+    color: '#ffffff',
+    marginBottom: '8px',
+  };
+
+  const emptyStateTextStyles = {
+    textAlign: 'center',
+    maxWidth: '400px',
+    color: '#d1d5db',
+    marginBottom: '24px',
+    lineHeight: '1.5',
+  };
+
+  const messageContainerStyles = {
+    width: '100%',
+  };
+
+  const messageWrapperStyles = {
+    margin: '0 auto',
+    display: 'flex',
+    gap: '24px',
+    padding: '24px 16px',
+    maxWidth: '768px',
+  };
+
+  const avatarStyles = {
+    minWidth: '30px',
+    display: 'flex',
+    alignItems: 'flex-start',
+  };
+
+  const userAvatarStyles = {
+    width: '28px',
+    height: '28px',
+    borderRadius: '4px',
+    backgroundColor: '#19c37d',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+
+  const botAvatarStyles = {
+    width: '28px',
+    height: '28px',
+    borderRadius: '4px',
+    background: 'linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+
+  const messageContentStyles = {
+    flex: 1,
+    color: '#d1d5db',
+    lineHeight: '1.6',
+  };
+
+  const markdownStyles = {
+    fontSize: '16px',
+    lineHeight: '1.6',
+    color: '#d1d5db',
+  };
+
+  const sourcesContainerStyles = {
+    marginTop: '16px',
+    backgroundColor: '#40414f',
+    border: '1px solid #565869',
+    borderRadius: '8px',
+    padding: '16px',
+  };
+
+  const sourcesTitleStyles = {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#ffffff',
+    marginBottom: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  };
+
+  const sourceItemStyles = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px',
+    backgroundColor: '#343541',
+    borderRadius: '6px',
+    marginBottom: '4px',
+    color: '#d1d5db',
+  };
+
+  const actionBarStyles = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: '16px',
+    paddingTop: '16px',
+    borderTop: '1px solid #565869',
+  };
+
+  const actionButtonsStyles = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+  };
+
+  const actionButtonStyles = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: '#8e8ea0',
+    cursor: 'pointer',
+    fontSize: '14px',
+    transition: 'color 0.2s',
+  };
+
+  const timestampStyles = {
+    fontSize: '12px',
+    color: '#8e8ea0',
+  };
+
+  const loadingMessageStyles = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    color: '#8e8ea0',
+    fontSize: '14px',
+  };
+
+  // Markdown component styles for dark theme
+  const markdownComponents = {
+    h1: ({node, ...props}) => <h1 style={{fontSize: '20px', fontWeight: 600, color: '#ffffff', marginBottom: '12px'}} {...props} />,
+    h2: ({node, ...props}) => <h2 style={{fontSize: '18px', fontWeight: 600, color: '#ffffff', marginBottom: '8px'}} {...props} />,
+    h3: ({node, ...props}) => <h3 style={{fontSize: '16px', fontWeight: 600, color: '#ffffff', marginBottom: '8px'}} {...props} />,
+    p: ({node, ...props}) => <p style={{marginBottom: '12px', lineHeight: '1.6', color: '#d1d5db'}} {...props} />,
+    ul: ({node, ...props}) => <ul style={{listStyleType: 'disc', marginLeft: '20px', marginBottom: '12px', color: '#d1d5db'}} {...props} />,
+    ol: ({node, ...props}) => <ol style={{listStyleType: 'decimal', marginLeft: '20px', marginBottom: '12px', color: '#d1d5db'}} {...props} />,
+    li: ({node, ...props}) => <li style={{marginBottom: '4px', display: 'list-item', color: '#d1d5db'}} {...props} />,
+    strong: ({node, ...props}) => <strong style={{fontWeight: 600, color: '#ffffff'}} {...props} />,
+    em: ({node, ...props}) => <em style={{fontStyle: 'italic', color: '#d1d5db'}} {...props} />,
+    code: ({node, inline, ...props}) => 
+      inline ? 
+        <code style={{
+          backgroundColor: '#40414f',
+          color: '#ffffff',
+          padding: '2px 6px',
+          borderRadius: '4px',
+          fontSize: '14px',
+          fontFamily: 'Monaco, Consolas, "Courier New", monospace',
+        }} {...props} /> :
+        <code style={{
+          display: 'block',
+          backgroundColor: '#40414f',
+          color: '#ffffff',
+          padding: '16px',
+          borderRadius: '8px',
+          fontSize: '14px',
+          fontFamily: 'Monaco, Consolas, "Courier New", monospace',
+          overflowX: 'auto',
+          marginBottom: '12px',
+        }} {...props} />,
+    blockquote: ({node, ...props}) => <blockquote style={{
+      borderLeft: '4px solid #565869',
+      paddingLeft: '16px',
+      fontStyle: 'italic',
+      color: '#8e8ea0',
+      marginBottom: '12px',
+    }} {...props} />
+  };
+
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div style={chatAreaStyles}>
       {messages.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-full text-gray-500">
-          <div className="w-16 h-16 bg-gradient-to-r from-purple-100 to-blue-100 rounded-full flex items-center justify-center mb-6">
-            <Bot className="w-8 h-8 text-purple-600" />
+        <div style={emptyStateStyles}>
+          <div style={emptyStateIconStyles}>
+            <Bot size={32} color="#d1d5db" />
           </div>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Welcome to StarRAG Bot</h2>
-          <p className="text-center max-w-md text-gray-600 mb-6">
+          <h2 style={emptyStateTitleStyles}>Welcome to StarRAG Bot</h2>
+          <p style={emptyStateTextStyles}>
             Upload documents and ask me anything about their content!
           </p>
         </div>
@@ -52,122 +252,115 @@ const ChatArea = ({ messages, isLoading, messagesEndRef }) => {
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`group w-full border-b border-gray-200 ${
-                message.type === 'user' ? 'bg-white' : 'bg-gray-50'
-              }`}
+              style={{
+                ...messageContainerStyles,
+                backgroundColor: message.type === 'user' ? '#343541' : '#444654',
+              }}
             >
-              <div className="m-auto flex gap-6 p-4 text-base md:max-w-2xl lg:max-w-[38rem] xl:max-w-3xl">
-                <div className="min-w-[30px]">
+              <div style={messageWrapperStyles}>
+                <div style={avatarStyles}>
                   {message.type === 'user' ? (
-                    <User className="w-6 h-6 text-gray-600" />
+                    <div style={userAvatarStyles}>
+                      <User size={16} color="#ffffff" />
+                    </div>
                   ) : (
-                    <Bot className="w-6 h-6 text-purple-600" />
+                    <div style={botAvatarStyles}>
+                      <Bot size={16} color="#ffffff" />
+                    </div>
                   )}
                 </div>
-                <div className="prose prose-gray max-w-none flex-1">
-                  <div className="text-gray-900 markdown-content" style={{
-                    lineHeight: '1.6'
-                  }}>
+                <div style={messageContentStyles}>
+                  <div style={markdownStyles}>
                     <ReactMarkdown
                       remarkPlugins={[remarkMath]}
                       rehypePlugins={[rehypeKatex]}
-                      components={{
-                        h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-3 text-gray-900" {...props} />,
-                        h2: ({node, ...props}) => <h2 className="text-lg font-semibold mb-2 text-gray-800" {...props} />,
-                        h3: ({node, ...props}) => <h3 className="text-md font-medium mb-2 text-gray-700" {...props} />,
-                        p: ({node, ...props}) => <p className="mb-2 leading-relaxed" {...props} />,
-                        ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
-                        ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
-                        li: ({node, ...props}) => <li className="leading-relaxed block" {...props} />,
-                        strong: ({node, ...props}) => <strong className="font-semibold text-gray-900" {...props} />,
-                        em: ({node, ...props}) => <em className="italic" {...props} />,
-                        code: ({node, inline, ...props}) => 
-                          inline ? 
-                            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono" {...props} /> :
-                            <code className="block bg-gray-100 p-3 rounded-lg text-sm font-mono overflow-x-auto" {...props} />,
-                        blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600" {...props} />
-                      }}
+                      components={markdownComponents}
                     >
                       {message.content}
                     </ReactMarkdown>
                   </div>
                   
                   {message.sources && message.sources.length > 0 && (
-                    <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
+                    <div style={sourcesContainerStyles}>
+                      <h4 style={sourcesTitleStyles}>
+                        <FileText size={16} />
                         Sources
                       </h4>
-                      <div className="space-y-2">
+                      <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
                         {message.sources.map((source, idx) => (
-                          <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
-                            <FileText className="w-4 h-4 text-gray-500" />
-                            <span className="text-sm text-gray-600">{source}</span>
+                          <div key={idx} style={sourceItemStyles}>
+                            <FileText size={16} color="#8e8ea0" />
+                            <span style={{fontSize: '14px'}}>{source}</span>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
                   
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                    <div className="flex items-center gap-4">
+                  <div style={actionBarStyles}>
+                    <div style={actionButtonsStyles}>
                       {message.type === 'user' ? (
-                        // Copy button for user questions
                         <button 
                           onClick={() => copyToClipboard(message.content, index)}
-                          className="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors"
+                          style={actionButtonStyles}
+                          onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+                          onMouseLeave={(e) => e.target.style.color = '#8e8ea0'}
                           title="Copy question"
                         >
                           {copiedIndex === index ? (
                             <>
-                              <Check className="w-4 h-4 text-green-600" />
-                              <span className="text-sm text-green-600">Copied!</span>
+                              <Check size={16} color="#19c37d" />
+                              <span style={{color: '#19c37d'}}>Copied!</span>
                             </>
                           ) : (
                             <>
-                              <Copy className="w-4 h-4" />
-                              <span className="text-sm">Copy</span>
+                              <Copy size={16} />
+                              <span>Copy</span>
                             </>
                           )}
                         </button>
                       ) : (
-                        // Both Copy and Helpful buttons for bot answers
                         <>
                           <button 
                             onClick={() => copyToClipboard(message.content, index)}
-                            className="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors"
+                            style={actionButtonStyles}
+                            onMouseEnter={(e) => e.target.style.color = '#ffffff'}
+                            onMouseLeave={(e) => e.target.style.color = '#8e8ea0'}
                             title="Copy answer"
                           >
                             {copiedIndex === index ? (
                               <>
-                                <Check className="w-4 h-4 text-green-600" />
-                                <span className="text-sm text-green-600">Copied!</span>
+                                <Check size={16} color="#19c37d" />
+                                <span style={{color: '#19c37d'}}>Copied!</span>
                               </>
                             ) : (
                               <>
-                                <Copy className="w-4 h-4" />
-                                <span className="text-sm">Copy</span>
+                                <Copy size={16} />
+                                <span>Copy</span>
                               </>
                             )}
                           </button>
                           <button 
                             onClick={() => markAsHelpful(index)}
-                            className={`flex items-center gap-1 transition-colors ${
-                              helpfulIndex === index 
-                                ? 'text-green-600' 
-                                : 'text-gray-500 hover:text-gray-700'
-                            }`}
+                            style={{
+                              ...actionButtonStyles,
+                              color: helpfulIndex === index ? '#19c37d' : '#8e8ea0'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (helpfulIndex !== index) e.target.style.color = '#ffffff'
+                            }}
+                            onMouseLeave={(e) => {
+                              if (helpfulIndex !== index) e.target.style.color = '#8e8ea0'
+                            }}
                             title="Mark as helpful"
                           >
-                            <ThumbsUp className="w-4 h-4" />
-                            <span className="text-sm">
-                              {helpfulIndex === index ? 'Thanks!' : 'Helpful'}
-                            </span>
+                            <ThumbsUp size={16} />
+                            <span>{helpfulIndex === index ? 'Thanks!' : 'Helpful'}</span>
                           </button>
                         </>
                       )}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div style={timestampStyles}>
                       {formatTime(message.timestamp)}
                     </div>
                   </div>
@@ -177,14 +370,16 @@ const ChatArea = ({ messages, isLoading, messagesEndRef }) => {
           ))}
           
           {isLoading && (
-            <div className="group w-full text-gray-800 bg-gray-50 border-b border-gray-200">
-              <div className="m-auto flex gap-6 p-4 text-base md:max-w-2xl lg:max-w-[38rem] xl:max-w-3xl">
-                <div className="min-w-[30px]">
-                  <Bot className="w-6 h-6 text-purple-600" />
+            <div style={{...messageContainerStyles, backgroundColor: '#444654'}}>
+              <div style={messageWrapperStyles}>
+                <div style={avatarStyles}>
+                  <div style={botAvatarStyles}>
+                    <Bot size={16} color="#ffffff" />
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
-                  <span className="text-gray-600">StarRAG is thinking...</span>
+                <div style={loadingMessageStyles}>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>StarRAG is thinking...</span>
                 </div>
               </div>
             </div>

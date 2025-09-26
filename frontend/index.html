@@ -4,14 +4,75 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="StarRAG - AI-powered document chat assistant" />
-    <meta name="keywords" content="AI chat, document analysis, StarRAG, local AI, conversation" />
-    <!-- public/index.html -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    
+    <!-- Improved SEO Meta Tags -->
+    <meta name="description" content="StarRAG - AI-powered document chat assistant. Upload documents and chat with AI to get intelligent answers based on your content." />
+    <meta name="keywords" content="AI chat, document analysis, StarRAG, RAG, AI assistant, document chat, local AI, conversation" />
+    
+    <!-- Open Graph Meta Tags for Social Sharing -->
+    <meta property="og:title" content="StarRAG - AI Document Assistant" />
+    <meta property="og:description" content="AI-powered document chat assistant. Upload documents and chat with AI to get intelligent answers." />
+    <meta property="og:type" content="website" />
+    
+    <!-- Theme Color for Mobile Browsers -->
+    <meta name="theme-color" content="#10a37f" />
+    
+    <!-- Preconnect to CDN for faster loading -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    
+    <!-- Highlight.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    
+    <!-- Katex for math rendering -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+    
     <title>StarRAG - AI Document Assistant</title>
+    
+    <!-- Additional performance optimizations -->
+    <style>
+      /* Critical CSS to prevent layout shift */
+      #root {
+        min-height: 100vh;
+      }
+      
+      /* Loading state styles */
+      .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background: #ffffff;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Optional loading placeholder -->
+      <div class="loading" style="display: none;">
+        <div>Loading StarRAG...</div>
+      </div>
+    </div>
+    
+    <!-- Async script loading for better performance -->
     <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- Optional: Loading state script -->
+    <script>
+      // Show loading state until React hydrates
+      document.addEventListener('DOMContentLoaded', function() {
+        const loadingElement = document.querySelector('.loading');
+        if (loadingElement) {
+          loadingElement.style.display = 'flex';
+        }
+      });
+      
+      // Hide loading when React app is ready
+      window.addEventListener('load', function() {
+        const loadingElement = document.querySelector('.loading');
+        if (loadingElement) {
+          loadingElement.style.display = 'none';
+        }
+      });
+    </script>
   </body>
 </html>

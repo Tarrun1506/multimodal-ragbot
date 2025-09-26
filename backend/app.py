@@ -11,6 +11,14 @@ import PyPDF2
 import docx
 import requests
 import faiss
+import whisper
+# Add these imports at the top
+import base64
+import wave
+import tempfile
+import os
+from speech_service import speech_service
+
 # Try new import first, fallback to old
 try:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -35,7 +43,7 @@ CORS(app)
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff'}
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'mp3', 'wav', 'm4a', 'ogg'}
 OLLAMA_BASE_URL = "http://localhost:11434"
 ALLOWED_MODELS = ['gemma3:1b', 'mistral:latest', 'llama3.2:1b']
 
@@ -72,6 +80,15 @@ try:
 except Exception as e:
     print(f"⚠️ EasyOCR initialization failed: {e}")
     easyocr_reader = None
+
+# Initialize Whisper model for audio transcription
+print("🔧 Loading Whisper model for audio transcription...")
+try:
+    whisper_model = whisper.load_model("base")  # You can use "small", "medium", "large" for better accuracy
+    print("✅ Whisper model loaded successfully")
+except Exception as e:
+    print(f"⚠️ Failed to load Whisper model: {e}")
+    whisper_model = None
 
 class RAGPipeline:
     def __init__(self):
@@ -471,7 +488,7 @@ def health_check():
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
-    """Handle file upload with better error handling"""
+    """Handle file upload with better error handling including audio files"""
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
@@ -483,6 +500,7 @@ def upload_file():
         if file and rag_pipeline.allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file_path = os.path.join(UPLOAD_FOLDER, filename)
+            file_ext = filename.rsplit('.', 1)[1].lower()
             
             # Save file with error handling
             try:
@@ -491,31 +509,78 @@ def upload_file():
             except Exception as save_error:
                 print(f"❌ Error saving file: {save_error}")
                 return jsonify({'error': f'Failed to save file: {str(save_error)}'}), 500
+
+            # Handle audio files with Whisper transcription
+            if file_ext in ['mp3', 'wav', 'm4a', 'ogg']:
+                if whisper_model is None:
+                    return jsonify({'error': 'Whisper model not loaded. Audio transcription unavailable.'}), 500
+                
+                try:
+                    print(f"🎵 Transcribing audio file: {filename}")
+                    result = whisper_model.transcribe(file_path)
+                    transcription = result.get('text', '').strip()
+                    
+                    if transcription:
+                        print(f"✅ Transcription completed: {len(transcription)} characters")
+                        
+                        # Create a text document from the transcription
+                        doc_filename = f"{filename}_transcript.txt"
+                        doc_path = os.path.join(UPLOAD_FOLDER, doc_filename)
+                        
+                        with open(doc_path, 'w', encoding='utf-8') as f:
+                            f.write(f"Audio Transcription from {filename}:\n\n{transcription}")
+                        
+                        # Process the transcription as a document
+                        success = rag_pipeline.process_document(doc_path, doc_filename)
+                        
+                        # Clean up temporary transcript file
+                        if os.path.exists(doc_path):
+                            os.remove(doc_path)
+                        
+                        if success:
+                            return jsonify({
+                                'message': f'Audio {filename} transcribed and processed successfully',
+                                'transcription': transcription[:500] + ('...' if len(transcription) > 500 else ''),
+                                'full_length': len(transcription)
+                            })
+                        else:
+                            return jsonify({'error': 'Failed to process transcription'}), 500
+                    else:
+                        return jsonify({'error': 'No speech detected in audio file'}), 400
+                        
+                except Exception as transcription_error:
+                    print(f"❌ Error transcribing audio: {transcription_error}")
+                    return jsonify({'error': f'Failed to transcribe audio: {str(transcription_error)}'}), 500
+                finally:
+                    # Clean up original audio file
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
             
-            # Process document with error handling
-            try:
-                success = rag_pipeline.process_document(file_path, filename)
-            except Exception as process_error:
-                print(f"❌ Error processing document: {process_error}")
-                # Clean up file even if processing fails
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                return jsonify({'error': f'Failed to process document: {str(process_error)}'}), 500
-            
-            # Clean up file
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-            except Exception as cleanup_error:
-                print(f"⚠️ Warning: Failed to clean up file: {cleanup_error}")
-            
-            if success:
-                print(f"✅ Successfully processed: {filename}")
-                return jsonify({'message': f'File {filename} processed successfully'})
+            # Handle regular document files
             else:
-                return jsonify({'error': 'Failed to process document'}), 500
+                try:
+                    success = rag_pipeline.process_document(file_path, filename)
+                except Exception as process_error:
+                    print(f"❌ Error processing document: {process_error}")
+                    # Clean up file even if processing fails
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                    return jsonify({'error': f'Failed to process document: {str(process_error)}'}), 500
+                
+                # Clean up file
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                except Exception as cleanup_error:
+                    print(f"⚠️ Warning: Failed to clean up file: {cleanup_error}")
+                
+                if success:
+                    print(f"✅ Successfully processed: {filename}")
+                    return jsonify({'message': f'File {filename} processed successfully'})
+                else:
+                    return jsonify({'error': 'Failed to process document'}), 500
         
-        return jsonify({'error': 'Invalid file type'}), 400
+        return jsonify({'error': 'Invalid file type. Supported: TXT, PDF, DOCX, Images (PNG, JPG, etc.), Audio (MP3, WAV, M4A, OGG)'}), 400
         
     except Exception as e:
         print(f"❌ Unexpected error in upload_file: {e}")
@@ -763,6 +828,159 @@ if __name__ == '__main__':
                     print(f"✅ Loaded {len(docs)} documents with {len(document_chunks)} chunks")
         except Exception as e:
             print(f"⚠️ Error loading existing documents: {e}")
-    
-    print("🚀 StarRAG Bot API starting...")
-    app.run(debug=False, port=5000, use_reloader=False)
+
+@app.route('/api/voice/speech-to-text', methods=['POST'])
+def speech_to_text():
+    """Convert speech audio to text"""
+    try:
+        data = request.json
+        
+        if not data or 'audio_data' not in data:
+            return jsonify({'error': 'No audio data provided'}), 400
+        
+        # Extract audio data and format
+        audio_base64 = data['audio_data']
+        audio_format = data.get('format', 'webm')  # Default to webm for browser recordings
+        language = data.get('language', 'en-US')
+        
+        # Decode base64 audio data
+        try:
+            audio_bytes = base64.b64decode(audio_base64.split(',')[-1] if ',' in audio_base64 else audio_base64)
+        except Exception as e:
+            return jsonify({'error': f'Invalid audio data: {str(e)}'}), 400
+        
+        # Convert speech to text
+        text = speech_service.speech_to_text(audio_bytes, audio_format, language)
+        
+        if text:
+            return jsonify({
+                'text': text,
+                'confidence': 'high',
+                'language': language
+            })
+        else:
+            return jsonify({
+                'error': 'Could not transcribe audio',
+                'text': '',
+                'confidence': 'low'
+            }), 400
+            
+    except Exception as e:
+        print(f"❌ Speech-to-text error: {e}")
+        return jsonify({'error': f'Speech recognition failed: {str(e)}'}), 500
+
+@app.route('/api/voice/text-to-speech', methods=['POST'])
+def text_to_speech():
+    """Convert text to speech (optional - for voice responses)"""
+    try:
+        data = request.json
+        
+        if not data or 'text' not in data:
+            return jsonify({'error': 'No text provided'}), 400
+        
+        text = data['text']
+        # For now, return a message about TTS availability
+        # You can integrate with external TTS services like Google TTS, Azure TTS, etc.
+        
+        return jsonify({
+            'message': 'Text-to-speech functionality can be integrated with external services',
+            'suggestions': [
+                'Google Cloud Text-to-Speech',
+                'Amazon Polly',
+                'Azure Cognitive Services',
+                'OpenAI TTS'
+            ]
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Text-to-speech error: {str(e)}'}), 500
+
+@app.route('/api/voice/supported-languages', methods=['GET'])
+def get_supported_languages():
+    """Get list of supported languages for speech recognition"""
+    languages = {
+        'en-US': 'English (US)',
+        'en-GB': 'English (UK)',
+        'es-ES': 'Spanish',
+        'fr-FR': 'French',
+        'de-DE': 'German',
+        'it-IT': 'Italian',
+        'pt-BR': 'Portuguese (Brazil)',
+        'ru-RU': 'Russian',
+        'ja-JP': 'Japanese',
+        'ko-KR': 'Korean',
+        'zh-CN': 'Chinese (Simplified)',
+        'hi-IN': 'Hindi'
+    }
+    return jsonify({'languages': languages})
+
+@app.route('/api/voice/whisper-status', methods=['GET'])
+def whisper_status():
+    """Check if Whisper model is loaded and ready"""
+    return jsonify({
+        'whisper_loaded': whisper_model is not None,
+        'model_type': 'base' if whisper_model is not None else None
+    })
+
+@app.route('/api/voice/transcribe-audio', methods=['POST'])
+def transcribe_audio():
+    """Transcribe audio data using Whisper"""
+    try:
+        if whisper_model is None:
+            return jsonify({'error': 'Whisper model not loaded. Audio transcription unavailable.'}), 500
+        
+        # Get audio data from request
+        data = request.get_json()
+        if not data or 'audio' not in data:
+            return jsonify({'error': 'No audio data provided'}), 400
+        
+        audio_base64 = data['audio']
+        
+        # Decode base64 audio data
+        try:
+            audio_data = base64.b64decode(audio_base64)
+            print(f"📊 Audio data decoded: {len(audio_data)} bytes")
+        except Exception as e:
+            print(f"❌ Base64 decode error: {e}")
+            return jsonify({'error': f'Invalid base64 audio data: {str(e)}'}), 400
+        
+        # Create temporary file for audio (use webm extension since that's what we're receiving)
+        with tempfile.NamedTemporaryFile(suffix='.webm', delete=False) as temp_audio:
+            temp_audio.write(audio_data)
+            temp_audio.flush()
+            
+            try:
+                # Transcribe using Whisper (Whisper can handle WebM format)
+                print(f"Transcribing recorded audio...")
+                result = whisper_model.transcribe(temp_audio.name)
+                transcription = result.get('text', '').strip()
+                
+                if transcription:
+                    print(f"Audio transcription completed: {len(transcription)} characters")
+                    return jsonify({
+                        'success': True,
+                        'transcription': transcription,
+                        'length': len(transcription)
+                    })
+                else:
+                    return jsonify({'error': 'No speech detected in audio'}), 400
+                    
+            except Exception as transcription_error:
+                print(f"Error transcribing audio: {transcription_error}")
+                return jsonify({'error': f'Failed to transcribe audio: {str(transcription_error)}'}), 500
+            finally:
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_audio.name)
+                except:
+                    pass
+                    
+    except Exception as e:
+        print(f"Unexpected error in transcribe_audio: {e}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+
+if __name__ == '__main__':
+    print("🚀 Starting StarRAG Bot server...")
+    print("📡 Server will be available at: http://localhost:5000")
+    print("🎯 API endpoints ready for transcription and document processing")
+    app.run(debug=True, host='0.0.0.0', port=5000)

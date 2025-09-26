@@ -16,3 +16,7 @@ Pillow==10.1.0
 pytesseract==0.3.10
 opencv-python==4.8.1.78
 easyocr==1.7.0
+SpeechRecognition==3.10.0
+pydub==0.25.1
+pyaudio==0.2.11
+openai-whisper==20231117
