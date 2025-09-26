@@ -1,0 +1,25 @@
+# Python virtual environment
+myenv/
+backend/myenv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Node dependencies
+node_modules/
+frontend/node_modules/
+
+# Build output
+dist/
+build/
+
+# User-specific files
+.env
+uploads/
+*.swp
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+npm-debug.log*
