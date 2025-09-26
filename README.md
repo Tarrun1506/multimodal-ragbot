@@ -17,7 +17,7 @@ StarRAG Bot is a full-stack web application that allows you to chat with your do
 - **Frontend**: React, Vite, Tailwind CSS
 - **Backend**: Python, Flask, LangChain
 - **Vector Store**: FAISS (for local similarity search)
-- **LLM Provider**: Ollama (running models like `gemma:2b`)
+- **LLM Provider**: Ollama (running models like `gemma3:1b`)
 
 ## Prerequisites
 
@@ -50,9 +50,9 @@ Before you begin, ensure you have the following installed on your system:
     ```
 
 4.  **Set up Ollama and Download a Model:**
-    First, ensure the Ollama application is running. Then, pull the model you wish to use. This project is configured to use `gemma:2b` by default.
+    First, ensure the Ollama application is running. Then, pull the model you wish to use. This project is configured to use `gemma3:1b` by default.
     ```bash
-    ollama pull gemma:2b
+    ollama pull gemma3:1b
     ```
 
 ## Running the Application
