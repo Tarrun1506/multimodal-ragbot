@@ -164,19 +164,141 @@ class RAGPipeline:
                 })
         
         return results
-
+    
+    def format_response(self, raw_response):
+        """Format the response with proper markdown and mathematical notation"""
+        import re
+        
+        # Clean up the response
+        formatted = raw_response.strip()
+        
+        # Fix bullet points - handle both line-start and inline bullets
+        # First, handle bullets at the start of lines
+        formatted = re.sub(r'^\*\s+([^\n]+)', r'- \1', formatted, flags=re.MULTILINE)
+        formatted = re.sub(r'^-\s+([^\n]+)', r'- \1', formatted, flags=re.MULTILINE)
+        
+        # Handle inline bullet lists - comprehensive approach
+        lines = formatted.split('\n')
+        new_lines = []
+        
+        for line in lines:
+            if '•' in line:
+                # Simple and reliable approach: split by bullet symbol
+                # Use regex to split on bullet points with optional surrounding whitespace
+                parts = re.split(r'\s*•\s*', line)
+                # Process each part
+                for part in parts:
+                    clean_part = part.strip()
+                    if clean_part:  # Skip empty parts
+                        new_lines.append(f'- {clean_part}')
+            else:
+                new_lines.append(line)
+        
+        formatted = '\n'.join(new_lines)
+        
+        # Clean up formatting issues
+        formatted = re.sub(r'^\s*-\s*$', '', formatted, flags=re.MULTILINE)  # Remove empty bullets
+        formatted = re.sub(r'\n\s*\n', '\n', formatted)  # Remove extra empty lines
+        
+        # Keep long bullet points intact - don't break them
+        # The user wants complete information, not truncated descriptions
+        
+        # Fix nested bullets
+        formatted = re.sub(r'^\s+\*\s+([^\n]+)', r'  - \1', formatted, flags=re.MULTILINE)
+        formatted = re.sub(r'^\s+-\s+([^\n]+)', r'  - \1', formatted, flags=re.MULTILINE)
+        
+        # Fix numbered lists
+        formatted = re.sub(r'(\d+)\.\s*([^\n]+)', r'\1. \2', formatted)
+        
+        # Fix bold formatting - ensure proper markdown
+        formatted = re.sub(r'\*\*([^*]+)\*\*', r'**\1**', formatted)
+        
+        # Fix mathematical formulas - convert to proper LaTeX format (more conservative)
+        # Only apply math formatting if the response seems to contain mathematical content
+        if any(char in formatted for char in ['=', '+', '-', '*', '/', '%']) and len(formatted.split()) < 50:
+            # Handle simple equations
+            formatted = re.sub(r'\b([A-Za-z_]+)\s*=\s*([A-Za-z0-9_+\-*/\s()]+)(?=\s|$)', r'$\1 = \2$', formatted)
+            # Handle fractions in equations
+            formatted = re.sub(r'\b(\d+)/(\d+)\b', r'$\\frac{\1}{\2}$', formatted)
+        # Handle percentages
+        formatted = re.sub(r'(\d+(?:\.\d+)?)\s*%', r'\1%', formatted)
+        
+        # Fix headers - ensure proper spacing (more conservative)
+        formatted = re.sub(r'^\*\*([A-Z][A-Za-z\s]{3,}):?\*\*\s*$', r'## \1', formatted, flags=re.MULTILINE)
+        # Don't convert single words or short phrases to headers
+        
+        # Ensure proper line breaks for readability
+        formatted = re.sub(r'\n\s*\n\s*\n+', '\n\n', formatted)
+        # Final cleanup for bullet formatting
+        # Remove any remaining bullet symbols that weren't converted
+        formatted = re.sub(r'•', '', formatted)
+        # Clean up multiple consecutive newlines
+        formatted = re.sub(r'\n{3,}', '\n\n', formatted)
+        # Remove empty lines between bullets
+        formatted = re.sub(r'\n\s*\n(-\s)', r'\n\1', formatted)
+        # Ensure proper spacing before bullet lists (but not between bullets)
+        formatted = re.sub(r'([^\n-])\n(-\s)', r'\1\n\n\2', formatted)
+        
+        # Fix common formatting issues
+        formatted = re.sub(r'\*\s*\*([^*]+)\*\s*\*', r'**\1**', formatted)
+        
+        return formatted.strip()
+    
     def generate_response(self, query, context_chunks, model="gemma3:1b"):
-        """Generate response using Ollama"""
+        """Generate response using Ollama with proper formatting"""
+        # Filter context for maximum relevance to the specific query
+        query_lower = query.lower()
+        
+        # For specific factual queries, prioritize chunks with the answer
+        if any(word in query_lower for word in ['who is', 'what is', 'when is', 'where is', 'which is']):
+            # Sort chunks by relevance to the specific question
+            relevant_chunks = []
+            for chunk in context_chunks:
+                chunk_lower = chunk["text"].lower()
+                relevance_score = 0
+                
+                # Check for direct answers to the question type
+                if 'publisher' in query_lower and 'publish' in chunk_lower:
+                    relevance_score += 10
+                elif 'author' in query_lower and 'author' in chunk_lower:
+                    relevance_score += 10
+                elif 'date' in query_lower and any(word in chunk_lower for word in ['date', 'year', 'published']):
+                    relevance_score += 10
+                
+                # Add chunks with high relevance first
+                if relevance_score > 5:
+                    relevant_chunks.insert(0, chunk)
+                else:
+                    relevant_chunks.append(chunk)
+            
+            # Use only the most relevant chunks (max 2 for specific questions)
+            context_chunks = relevant_chunks[:2]
+        
         context = "\n\n".join([chunk["text"] for chunk in context_chunks])
         
-        prompt = f"""Based on the following context, answer the question. If you can't find the answer, say so.
+        prompt = f"""You are a precise AI assistant. Answer the specific question using ONLY the most relevant information from the context.
 
 Context:
 {context}
 
 Question: {query}
 
-Answer:"""
+Instructions:
+1. Answer ONLY what is specifically asked - be direct and concise
+2. If the question asks for a specific fact (like "who is the publisher"), provide just that fact
+3. Don't include additional information unless directly relevant to the question
+4. Use **bold text** for the key answer
+5. If you need to provide a list, format it as follows (each item MUST be on a separate line):
+   - Item 1
+   - Item 2
+   - Item 3
+   
+   NEVER write: • Item1 • Item2 • Item3
+   ALWAYS write each item on its own line with proper spacing
+6. For mathematical formulas, use proper notation
+7. If the context doesn't contain the specific information asked, say so clearly
+
+Provide a focused, direct answer:"""
 
         try:
             # Check Ollama health
@@ -215,7 +337,8 @@ Answer:"""
             )
             
             if response.status_code == 200:
-                return response.json().get("response", "Sorry, I couldn't generate a response.")
+                raw_response = response.json().get("response", "Sorry, I couldn't generate a response.")
+                return self.format_response(raw_response)
             else:
                 error_msg = f"Ollama error (status {response.status_code})"
                 try:
