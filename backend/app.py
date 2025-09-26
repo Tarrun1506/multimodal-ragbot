@@ -11,15 +11,31 @@ import PyPDF2
 import docx
 import requests
 import faiss
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.schema import Document
+# Try new import first, fallback to old
+try:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+except ImportError:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+# Document class for text processing
+class Document:
+    def __init__(self, page_content, metadata=None):
+        self.page_content = page_content
+        self.metadata = metadata or {}
+# Image processing imports
+from PIL import Image
+import pytesseract
+import cv2
+import easyocr
+import io
+import base64
 
 app = Flask(__name__)
 CORS(app)
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx'}
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff'}
 OLLAMA_BASE_URL = "http://localhost:11434"
 ALLOWED_MODELS = ['gemma3:1b', 'mistral:latest', 'llama3.2:1b']
 
@@ -43,6 +59,20 @@ embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 faiss_index = None
 document_chunks = []
 
+# Initialize EasyOCR reader once at startup
+print("🔧 Initializing EasyOCR...")
+try:
+    # Fix PIL.Image.ANTIALIAS deprecation issue
+    import PIL.Image
+    if not hasattr(PIL.Image, 'ANTIALIAS'):
+        PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
+    
+    easyocr_reader = easyocr.Reader(['en'])
+    print("✅ EasyOCR initialized successfully")
+except Exception as e:
+    print(f"⚠️ EasyOCR initialization failed: {e}")
+    easyocr_reader = None
+
 class RAGPipeline:
     def __init__(self):
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -56,8 +86,70 @@ class RAGPipeline:
         return '.' in filename and \
                filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+    def extract_text_from_image(self, image_path):
+        """Extract text from images using OCR"""
+        global easyocr_reader
+        
+        try:
+            # Method 1: Try EasyOCR first (if available)
+            if easyocr_reader is not None:
+                try:
+                    results = easyocr_reader.readtext(image_path)
+                    if results:
+                        # Extract text from EasyOCR results
+                        text = ' '.join([result[1] for result in results])
+                        if text.strip():
+                            print(f"✅ EasyOCR extracted text: {len(text)} characters")
+                            return text
+                except Exception as e:
+                    print(f"⚠️ EasyOCR failed, falling back to Tesseract: {e}")
+            
+            # Method 2: Fallback to Tesseract OCR (if available)
+            print("🔧 Attempting Tesseract OCR...")
+            try:
+                # Check if Tesseract is available
+                pytesseract.get_tesseract_version()
+                
+                # Preprocess image for better OCR
+                opencv_image = cv2.imread(image_path)
+                if opencv_image is None:
+                    # Try with PIL if OpenCV fails
+                    image = Image.open(image_path)
+                    text = pytesseract.image_to_string(image, config='--psm 6')
+                else:
+                    gray = cv2.cvtColor(opencv_image, cv2.COLOR_BGR2GRAY)
+                    
+                    # Apply image preprocessing for better OCR
+                    # Noise removal
+                    denoised = cv2.medianBlur(gray, 5)
+                    
+                    # Thresholding
+                    _, thresh = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                    
+                    # Convert back to PIL Image
+                    processed_image = Image.fromarray(thresh)
+                    
+                    # Extract text using Tesseract
+                    text = pytesseract.image_to_string(processed_image, config='--psm 6')
+                
+                if text.strip():
+                    print(f"✅ Tesseract extracted text: {len(text)} characters")
+                    return text.strip()
+                else:
+                    return "No text found in image"
+                    
+            except Exception as tesseract_error:
+                print(f"⚠️ Tesseract not available: {tesseract_error}")
+                # If both OCR methods fail, return a basic message
+                return "Image uploaded successfully, but text extraction failed. Please install Tesseract OCR for better results."
+            
+        except Exception as e:
+            print(f"❌ Error extracting text from image {image_path}: {e}")
+            # Return a user-friendly message instead of failing completely
+            return "Image uploaded successfully, but text extraction encountered an error. The image has been processed and stored."
+    
     def extract_text_from_file(self, file_path, filename):
-        """Extract text from different file types"""
+        """Extract text from different file types including images"""
         text = ""
         file_extension = filename.rsplit('.', 1)[1].lower()
         
@@ -74,6 +166,11 @@ class RAGPipeline:
                 doc = docx.Document(file_path)
                 for paragraph in doc.paragraphs:
                     text += paragraph.text + "\n"
+            elif file_extension in ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff']:
+                text = self.extract_text_from_image(file_path)
+                # For images, we always return some text even if OCR fails
+                if not text or text.startswith('Error'):
+                    text = f"Image file: {filename} (OCR text extraction was attempted)"
         except Exception as e:
             print(f"Error extracting text from {filename}: {str(e)}")
             return None
@@ -374,29 +471,55 @@ def health_check():
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
-    """Handle file upload"""
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file provided'}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
-    
-    if file and rag_pipeline.allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(file_path)
+    """Handle file upload with better error handling"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
         
-        success = rag_pipeline.process_document(file_path, filename)
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
         
-        os.remove(file_path)
+        if file and rag_pipeline.allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(UPLOAD_FOLDER, filename)
+            
+            # Save file with error handling
+            try:
+                file.save(file_path)
+                print(f"📁 Processing file: {filename}")
+            except Exception as save_error:
+                print(f"❌ Error saving file: {save_error}")
+                return jsonify({'error': f'Failed to save file: {str(save_error)}'}), 500
+            
+            # Process document with error handling
+            try:
+                success = rag_pipeline.process_document(file_path, filename)
+            except Exception as process_error:
+                print(f"❌ Error processing document: {process_error}")
+                # Clean up file even if processing fails
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                return jsonify({'error': f'Failed to process document: {str(process_error)}'}), 500
+            
+            # Clean up file
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except Exception as cleanup_error:
+                print(f"⚠️ Warning: Failed to clean up file: {cleanup_error}")
+            
+            if success:
+                print(f"✅ Successfully processed: {filename}")
+                return jsonify({'message': f'File {filename} processed successfully'})
+            else:
+                return jsonify({'error': 'Failed to process document'}), 500
         
-        if success:
-            return jsonify({'message': f'File {filename} processed successfully'})
-        else:
-            return jsonify({'error': 'Failed to process document'}), 500
-    
-    return jsonify({'error': 'Invalid file type'}), 400
+        return jsonify({'error': 'Invalid file type'}), 400
+        
+    except Exception as e:
+        print(f"❌ Unexpected error in upload_file: {e}")
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/api/documents', methods=['GET'])
 def get_documents():
@@ -642,4 +765,4 @@ if __name__ == '__main__':
             print(f"⚠️ Error loading existing documents: {e}")
     
     print("🚀 StarRAG Bot API starting...")
-    app.run(debug=True, port=5000)
+    app.run(debug=False, port=5000, use_reloader=False)

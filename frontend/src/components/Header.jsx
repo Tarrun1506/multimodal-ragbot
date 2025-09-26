@@ -43,7 +43,7 @@ const Header = ({
             {showDocuments && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg border border-gray-200 z-50 p-4">
                 <div className="flex justify-between items-center mb-3">
-                  <h3 className="font-medium">Documents</h3>
+                  <h3 className="font-medium">Documents & Images</h3>
                   <button onClick={() => setShowDocuments(false)} className="text-gray-400 hover:text-gray-500">
                     <X className="w-5 h-5" />
                   </button>
@@ -70,12 +70,12 @@ const Header = ({
                   className="mt-3 w-full flex items-center justify-center gap-2 text-sm bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-md"
                 >
                   <Plus className="w-4 h-4" />
-                  Add documents
+                  Add files
                 </button>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".txt,.pdf,.docx"
+                  accept=".txt,.pdf,.docx,.png,.jpg,.jpeg,.gif,.bmp,.tiff"
                   onChange={onUploadFile}
                   className="hidden"
                   multiple
